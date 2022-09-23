@@ -252,9 +252,13 @@ class NonMaxSuppressionCalculator : public CalculatorBase {
   void NonMaxSuppression(const IndexedScores& indexed_scores,
                          const Detections& detections, int max_num_detections,
                          CalculatorContext* cc, Detections* output_detections) {
+    // LOG(INFO) << "Performing NMS...";
     std::vector<Location> retained_locations;
     retained_locations.reserve(max_num_detections);
     // We traverse the detections by decreasing score.
+    // LOG(INFO) << "\n"; // mod
+    // LOG(INFO) << "[Detections to NMS: " << detections.size(); // mod
+    // int output_count = 0; // mod
     for (const auto& indexed_score : indexed_scores) {
       const auto& detection = detections[indexed_score.first];
       if (options_.min_score_threshold() > 0 &&
@@ -285,21 +289,26 @@ class NonMaxSuppressionCalculator : public CalculatorBase {
       if (!suppressed) {
         output_detections->push_back(detection);
         retained_locations.push_back(location);
+        // output_count++; // mod
       }
       if (output_detections->size() >= max_num_detections) {
         break;
       }
     }
+    // LOG(INFO) << "detections from NMS: " << output_count << "]"; // mod
+
   }
 
   void WeightedNonMaxSuppression(const IndexedScores& indexed_scores,
                                  const Detections& detections,
                                  int max_num_detections, CalculatorContext* cc,
                                  Detections* output_detections) {
+    // LOG(INFO) << "Performing Weighted NMS...";
     IndexedScores remained_indexed_scores;
     remained_indexed_scores.assign(indexed_scores.begin(),
                                    indexed_scores.end());
-
+    // LOG(INFO) << "Number of detections before NMS: " << detections.size(); // mod
+    // int output_count = 0; // mod
     IndexedScores remained;
     IndexedScores candidates;
     output_detections->clear();
@@ -328,6 +337,9 @@ class NonMaxSuppressionCalculator : public CalculatorBase {
       if (!candidates.empty()) {
         const int num_keypoints =
             detection.location_data().relative_keypoints_size();
+
+        // LOG(INFO) << "num_keypoints: " << num_keypoints;
+        
         std::vector<float> keypoints(num_keypoints * 2);
         float w_xmin = 0.0f;
         float w_ymin = 0.0f;
@@ -368,6 +380,7 @@ class NonMaxSuppressionCalculator : public CalculatorBase {
       }
 
       output_detections->push_back(weighted_detection);
+      // output_count++; //mod
       // Breaks the loop if the size of indexed scores doesn't change after an
       // iteration.
       if (original_indexed_scores_size == remained.size()) {
@@ -376,6 +389,7 @@ class NonMaxSuppressionCalculator : public CalculatorBase {
         remained_indexed_scores = std::move(remained);
       }
     }
+    // LOG(INFO) << "Number of detections after NMS: " << output_count; // mod
   }
 
   NonMaxSuppressionCalculatorOptions options_;

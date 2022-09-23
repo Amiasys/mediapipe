@@ -79,20 +79,24 @@ absl::Status RectTransformationCalculator::GetContract(CalculatorContract* cc) {
                    (cc->Inputs().HasTag(kRectsTag) ? 1 : 0),
                1);
   if (cc->Inputs().HasTag(kRectTag)) {
+    // LOG(INFO) << "is kRectTag";
     cc->Inputs().Tag(kRectTag).Set<Rect>();
     cc->Outputs().Index(0).Set<Rect>();
   }
   if (cc->Inputs().HasTag(kRectsTag)) {
+    // LOG(INFO) << "is kRectsTag";
     cc->Inputs().Tag(kRectsTag).Set<std::vector<Rect>>();
     cc->Outputs().Index(0).Set<std::vector<Rect>>();
   }
   if (cc->Inputs().HasTag(kNormRectTag)) {
+    // LOG(INFO) << "is kNormRectTag";
     RET_CHECK(cc->Inputs().HasTag(kImageSizeTag));
     cc->Inputs().Tag(kNormRectTag).Set<NormalizedRect>();
     cc->Inputs().Tag(kImageSizeTag).Set<std::pair<int, int>>();
     cc->Outputs().Index(0).Set<NormalizedRect>();
   }
   if (cc->Inputs().HasTag(kNormRectsTag)) {
+    // LOG(INFO) << "is kNormRectsTag";
     RET_CHECK(cc->Inputs().HasTag(kImageSizeTag));
     cc->Inputs().Tag(kNormRectsTag).Set<std::vector<NormalizedRect>>();
     cc->Inputs().Tag(kImageSizeTag).Set<std::pair<int, int>>();
@@ -113,7 +117,18 @@ absl::Status RectTransformationCalculator::Open(CalculatorContext* cc) {
 }
 
 absl::Status RectTransformationCalculator::Process(CalculatorContext* cc) {
+  // LOG(INFO) << "Entering RectTransformationCalculator";
+  // LOG(INFO) << "Has kImageSizeTag Tag: " << HasTagValue(cc->Inputs(), kImageSizeTag);
+  // LOG(INFO) << "Has kNormRectsTag Tag: " << cc->Inputs().HasTag(kNormRectsTag);
+
+  // const auto& image_size = cc->Inputs().Tag(kImageSizeTag).Get<std::pair<int, int>>();
+  // LOG(INFO) << "INPUT image_size is: " << image_size.first << " and " << image_size.second;
+  // auto rects = cc->Inputs().Tag(kNormRectsTag).Get<std::vector<NormalizedRect>>();
+  // LOG(INFO) << "rect_transformation with roi inputs: " << rects.size();
+
+
   if (cc->Inputs().HasTag(kRectTag) && !cc->Inputs().Tag(kRectTag).IsEmpty()) {
+    // LOG(INFO) << "1";
     auto rect = cc->Inputs().Tag(kRectTag).Get<Rect>();
     TransformRect(&rect);
     cc->Outputs().Index(0).AddPacket(
@@ -121,6 +136,7 @@ absl::Status RectTransformationCalculator::Process(CalculatorContext* cc) {
   }
   if (cc->Inputs().HasTag(kRectsTag) &&
       !cc->Inputs().Tag(kRectsTag).IsEmpty()) {
+    // LOG(INFO) << "2";
     auto rects = cc->Inputs().Tag(kRectsTag).Get<std::vector<Rect>>();
     auto output_rects = absl::make_unique<std::vector<Rect>>(rects.size());
     for (int i = 0; i < rects.size(); ++i) {
@@ -132,6 +148,7 @@ absl::Status RectTransformationCalculator::Process(CalculatorContext* cc) {
   }
   if (HasTagValue(cc->Inputs(), kNormRectTag) &&
       HasTagValue(cc->Inputs(), kImageSizeTag)) {
+    // LOG(INFO) << "3";
     auto rect = cc->Inputs().Tag(kNormRectTag).Get<NormalizedRect>();
     const auto& image_size =
         cc->Inputs().Tag(kImageSizeTag).Get<std::pair<int, int>>();
@@ -141,12 +158,15 @@ absl::Status RectTransformationCalculator::Process(CalculatorContext* cc) {
   }
   if (HasTagValue(cc->Inputs(), kNormRectsTag) &&
       HasTagValue(cc->Inputs(), kImageSizeTag)) {
+    // LOG(INFO) << "4";
     auto rects =
         cc->Inputs().Tag(kNormRectsTag).Get<std::vector<NormalizedRect>>();
+    // LOG(INFO) << "rect_transformation with roi inputs: " << rects.size();
     const auto& image_size =
         cc->Inputs().Tag(kImageSizeTag).Get<std::pair<int, int>>();
     auto output_rects =
         absl::make_unique<std::vector<NormalizedRect>>(rects.size());
+    // loop through the rects and transform each here
     for (int i = 0; i < rects.size(); ++i) {
       output_rects->at(i) = rects[i];
       auto it = output_rects->begin() + i;
@@ -154,7 +174,7 @@ absl::Status RectTransformationCalculator::Process(CalculatorContext* cc) {
     }
     cc->Outputs().Index(0).Add(output_rects.release(), cc->InputTimestamp());
   }
-
+  // LOG(INFO) << "Exiting RectTransformationCalculator";
   return absl::OkStatus();
 }
 

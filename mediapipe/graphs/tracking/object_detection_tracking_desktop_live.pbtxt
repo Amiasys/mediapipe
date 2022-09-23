@@ -3,9 +3,44 @@
 # Used in the examples in
 # mediapipie/examples/desktop/object_tracking/
 
+profiler_config {
+  trace_enabled: true
+  enable_profiler: true
+  trace_log_interval_count: 200
+  enable_stream_latency: true
+  trace_log_path: "/home/ziheng/workspace/Github/mediapipe/Logfiles/"
+}
+
 # Images on CPU coming into and out of the graph.
 input_stream: "input_video"
 output_stream: "output_video"
+
+
+# Side packets into FilterDetectionsCalculator, 
+# to take a subset of detections allowing only class_id and up to max_num
+# node {
+#   calculator: "ConstantSidePacketCalculator"
+#   output_side_packet: "PACKET:class_id"
+#   output_side_packet: "PACKET:max_num"
+#   node_options: {
+#     [type.googleapis.com/mediapipe.ConstantSidePacketCalculatorOptions]: {
+#       packet { int_value: 1 }
+#       packet { int_value: 3 }
+#     }
+#   }
+# }
+
+
+
+node {
+  calculator: "ConstantSidePacketCalculator"
+  output_side_packet: "PACKET:model_complexity"
+  node_options: {
+    [type.googleapis.com/mediapipe.ConstantSidePacketCalculatorOptions]: {
+      packet { int_value: 0 }
+    }
+  }
+}
 
 # Resamples the images by specific frame rate. This calculator is used to
 # control the frequecy of subsequent calculators/subgraphs, e.g. less power
@@ -16,30 +51,84 @@ node {
   output_stream: "DATA:throttled_input_video"
   node_options: {
     [type.googleapis.com/mediapipe.PacketResamplerCalculatorOptions] {
-      frame_rate: 3
+      frame_rate: 3 # originally 3
     }
   }
 }
 
 # Subgraph that detections objects (see object_detection_cpu.pbtxt).
 node {
-  calculator: "ObjectDetectionSubgraphCpu"
+  calculator: "ObjectDetectionSubgraphGpu"
   input_stream: "IMAGE:throttled_input_video"
   output_stream: "DETECTIONS:output_detections"
 }
 
+# Calculator unit to filter detections by class_id up to max_num from detection
+# output maximum number of detections of interest
+node {
+  calculator: "FilterDetectionsCalculator"
+  # input_side_packet: "CLASS_ID:class_id"
+  # input_side_packet: "MAX_NUM:max_num"
+  input_stream: "INPUT_DETECTIONS:output_detections"
+  output_stream: "OUTPUT_DETECTIONS:filtered_output_detections"
+  node_options: {
+    [type.googleapis.com/mediapipe.FilterDetectionsCalculatorOptions] {
+      class_id: "person"
+      max_num: 5
+    }
+  }
+}
+
+
 # Subgraph that tracks objects (see object_tracking_cpu.pbtxt).
 node {
-  calculator: "ObjectTrackingSubgraphCpu"
+  calculator: "ObjectTrackingSubgraphGpu"
   input_stream: "VIDEO:input_video"
-  input_stream: "DETECTIONS:output_detections"
+  input_stream: "DETECTIONS:filtered_output_detections"
   output_stream: "DETECTIONS:tracked_detections"
 }
+
+# filter detections up to max_num from tracking
+# output maximum number of tracked targets of interest
+node {
+  calculator: "FilterDetectionsCalculator"
+  input_stream: "INPUT_DETECTIONS:tracked_detections"
+  output_stream: "OUTPUT_DETECTIONS:filtered_tracked_detections"
+  node_options: {
+    [type.googleapis.com/mediapipe.FilterDetectionsCalculatorOptions] {
+      class_id: "person"
+      max_num: 3
+    }
+  }
+}
+
+# convert tracked detections into rois
+node {
+  calculator: "DetectionsToRoisSubgraphCpu"
+  input_stream: "DETECTIONS:filtered_tracked_detections"
+  input_stream: "IMAGE:input_video"
+  output_stream: "ROIS:rois"
+}
+
+node {
+  calculator: "PoseLandmarkByRoiCpu"
+  input_side_packet: "MODEL_COMPLEXITY:model_complexity"
+  input_side_packet: "ENABLE_SEGMENTATION:enable_segmentation"
+  input_stream: "IMAGE:input_video"
+  input_stream: "ROIS:rois"
+  output_stream: "LANDMARKS:unfiltered_pose_landmarks"
+  # output_stream: "AUXILIARY_LANDMARKS:unfiltered_auxiliary_landmarks"
+  # output_stream: "WORLD_LANDMARKS:unfiltered_world_landmarks"
+  # output_stream: "SEGMENTATION_MASK:unfiltered_segmentation_mask"
+}
+
 
 # Subgraph that renders annotations and overlays them on top of input images (see renderer_cpu.pbtxt).
 node {
   calculator: "RendererSubgraphCpu"
   input_stream: "IMAGE:input_video"
-  input_stream: "DETECTIONS:tracked_detections"
+  input_stream: "DETECTIONS:filtered_tracked_detections"
+  input_stream: "LANDMARKS:unfiltered_pose_landmarks"
+  input_stream: "NORM_RECTS:rois"
   output_stream: "IMAGE:output_video"
 }

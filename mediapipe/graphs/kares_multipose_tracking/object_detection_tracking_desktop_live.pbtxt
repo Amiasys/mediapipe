@@ -1,0 +1,165 @@
+# MediaPipe graph that performs object detection and tracking with TensorFlow
+# Lite on CPU.
+# Used in the examples in
+# mediapipie/examples/desktop/object_tracking/
+
+# profiler_config {
+#   trace_enabled: true
+#   enable_profiler: true
+#   trace_log_interval_count: 200
+#   enable_stream_latency: true
+#   trace_log_path: "/home/ziheng/workspace/Github/mediapipe/Logfiles/"
+# }
+
+# Images on CPU coming into and out of the graph.
+input_stream: "input_video"
+output_stream: "output_video"
+output_stream: "multi_face_landmarks"
+
+
+
+
+node {
+  calculator: "ConstantSidePacketCalculator"
+  output_side_packet: "PACKET:model_complexity"
+  node_options: {
+    [type.googleapis.com/mediapipe.ConstantSidePacketCalculatorOptions]: {
+      packet { int_value: 0 }
+    }
+  }
+}
+node {
+  calculator: "ConstantSidePacketCalculator"
+  output_side_packet: "PACKET:0:num_faces"
+  output_side_packet: "PACKET:1:with_attention"
+  node_options: {
+    [type.googleapis.com/mediapipe.ConstantSidePacketCalculatorOptions]: {
+      packet { int_value: 2 }
+      packet { bool_value: true }
+    }
+  }
+}
+
+# Subgraph that detects faces and corresponding landmarks.
+node {
+  calculator: "FaceLandmarkFrontCpu"
+  input_stream: "IMAGE:input_video"
+  input_side_packet: "NUM_FACES:num_faces"
+  input_side_packet: "WITH_ATTENTION:with_attention"
+  output_stream: "LANDMARKS:multi_face_landmarks"
+  output_stream: "ROIS_FROM_LANDMARKS:face_rects_from_landmarks"
+  output_stream: "DETECTIONS:face_detections"
+  output_stream: "ROIS_FROM_DETECTIONS:face_rects_from_detections"
+}
+
+
+
+# Subgraph that detects poses and corresponding landmarks.
+node {
+  calculator: "PoseLandmarkKares"
+  input_side_packet: "MODEL_COMPLEXITY:model_complexity"
+  input_stream: "IMAGE:input_video"
+  output_stream: "LANDMARKS:unfiltered_pose_landmarks"
+  output_stream: "DETECTIONS:filtered_tracked_detections"
+  output_stream: "ROIS:rois"
+}
+
+# # Resamples the images by specific frame rate. This calculator is used to
+# # control the frequecy of subsequent calculators/subgraphs, e.g. less power
+# # consumption for expensive process.
+# node {
+#   calculator: "PacketResamplerCalculator"
+#   input_stream: "DATA:input_video"
+#   output_stream: "DATA:throttled_input_video"
+#   node_options: {
+#     [type.googleapis.com/mediapipe.PacketResamplerCalculatorOptions] {
+#       frame_rate: 3 # originally 3
+#     }
+#   }
+# }
+
+# # Subgraph that detections objects (see object_detection_cpu.pbtxt).
+# node {
+#   calculator: "ObjectDetectionSubgraphGpu"
+#   input_stream: "IMAGE:throttled_input_video"
+#   output_stream: "DETECTIONS:output_detections"
+# }
+
+# # Calculator unit to filter detections by class_id up to max_num from detection
+# # output maximum number of detections of interest
+# node {
+#   calculator: "FilterDetectionsCalculator"
+#   # input_side_packet: "CLASS_ID:class_id"
+#   # input_side_packet: "MAX_NUM:max_num"
+#   input_stream: "INPUT_DETECTIONS:output_detections"
+#   output_stream: "OUTPUT_DETECTIONS:filtered_output_detections"
+#   node_options: {
+#     [type.googleapis.com/mediapipe.FilterDetectionsCalculatorOptions] {
+#       class_id: "person"
+#       max_num: 5
+#     }
+#   }
+# }
+
+
+# # Subgraph that tracks objects (see object_tracking_cpu.pbtxt).
+# node {
+#   calculator: "ObjectTrackingSubgraphGpu"
+#   input_stream: "VIDEO:input_video"
+#   input_stream: "DETECTIONS:filtered_output_detections"
+#   output_stream: "DETECTIONS:tracked_detections"
+# }
+
+# # filter detections up to max_num from tracking
+# # output maximum number of tracked targets of interest
+# node {
+#   calculator: "FilterDetectionsCalculator"
+#   input_stream: "INPUT_DETECTIONS:tracked_detections"
+#   output_stream: "OUTPUT_DETECTIONS:filtered_tracked_detections"
+#   node_options: {
+#     [type.googleapis.com/mediapipe.FilterDetectionsCalculatorOptions] {
+#       class_id: "person"
+#       max_num: 3
+#     }
+#   }
+# }
+
+# # convert tracked detections into rois
+# node {
+#   calculator: "DetectionsToRoisSubgraphCpu"
+#   input_stream: "DETECTIONS:filtered_tracked_detections"
+#   input_stream: "IMAGE:input_video"
+#   output_stream: "ROIS:rois"
+# }
+
+# node {
+#   calculator: "PoseLandmarkByRoiCpu"
+#   input_side_packet: "MODEL_COMPLEXITY:model_complexity"
+#   input_side_packet: "ENABLE_SEGMENTATION:enable_segmentation"
+#   input_stream: "IMAGE:input_video"
+#   input_stream: "ROIS:rois"
+#   output_stream: "LANDMARKS:unfiltered_pose_landmarks"
+#   # output_stream: "AUXILIARY_LANDMARKS:unfiltered_auxiliary_landmarks"
+#   # output_stream: "WORLD_LANDMARKS:unfiltered_world_landmarks"
+#   # output_stream: "SEGMENTATION_MASK:unfiltered_segmentation_mask"
+# }
+
+
+# Subgraph that renders annotations and overlays them on top of input images (see renderer_cpu.pbtxt).
+node {
+  calculator: "RendererSubgraphCpu"
+  input_stream: "IMAGE:input_video"
+  input_stream: "DETECTIONS:filtered_tracked_detections"
+  input_stream: "LANDMARKS:unfiltered_pose_landmarks"
+  input_stream: "NORM_RECTS:rois"
+  output_stream: "IMAGE:output_video"
+}
+# # Subgraph that renders face-landmark annotation onto the input image.
+# node {
+#   calculator: "FaceRendererCpu"
+#   input_stream: "IMAGE:input_video"
+#   input_stream: "LANDMARKS:multi_face_landmarks"
+#   input_stream: "NORM_RECTS:face_rects_from_landmarks"
+#   input_stream: "DETECTIONS:face_detections"
+#   output_stream: "IMAGE:output_video"
+# }

@@ -25,4 +25,6 @@ message FilterDetectionsCalculatorOptions {
 
   // Detections lower than this score get filtered out.
   optional float min_score = 1;
+  optional string class_id = 2;
+  optional float max_num = 3;
 }

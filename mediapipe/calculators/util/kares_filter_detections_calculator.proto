@@ -1,0 +1,16 @@
+// Copyright 2022 Kares
+
+syntax = "proto2";
+
+package mediapipe;
+
+import "mediapipe/framework/calculator.proto";
+
+message FilterDetectionsCalculatorOptions {
+  extend mediapipe.CalculatorOptions {
+    optional FilterDetectionsCalculatorOptions ext = 395478132;
+  }
+
+  optional int class_id = 1;
+  optional int max_num = 3;
+}

@@ -30,12 +30,16 @@ namespace mediapipe {
 namespace {
 
 constexpr char kDetectionTag[] = "DETECTION";
-constexpr char kDetectionsTag[] = "DETECTIONS";
+
+constexpr char kDetectionsTag[] = "DETECTIONS"; // supports multiple DETECTIONS inputs
+
 constexpr char kImageSizeTag[] = "IMAGE_SIZE";
 constexpr char kRectTag[] = "RECT";
 constexpr char kNormRectTag[] = "NORM_RECT";
 constexpr char kRectsTag[] = "RECTS";
-constexpr char kNormRectsTag[] = "NORM_RECTS";
+
+constexpr char kNormRectsTag[] = "NORM_RECTS"; // supports multiple NORM_RECTS outputs
+
 
 constexpr float kMinFloat = std::numeric_limits<float>::lowest();
 constexpr float kMaxFloat = std::numeric_limits<float>::max();
@@ -139,7 +143,7 @@ absl::Status DetectionsToRectsCalculator::GetContract(CalculatorContract* cc) {
                1)
       << "Exactly one of NORM_RECT, RECT, NORM_RECTS or RECTS output stream "
          "should be provided.";
-
+  // LOG(INFO) << "has IMAGE_SIZE tag: " << cc->Inputs().HasTag(kImageSizeTag);
   if (cc->Inputs().HasTag(kDetectionTag)) {
     cc->Inputs().Tag(kDetectionTag).Set<Detection>();
   }
@@ -195,24 +199,46 @@ absl::Status DetectionsToRectsCalculator::Open(CalculatorContext* cc) {
 }
 
 absl::Status DetectionsToRectsCalculator::Process(CalculatorContext* cc) {
+  std::vector<Detection> detections;
+  // detections = cc->Inputs().Tag(kDetectionsTag).Get<std::vector<Detection>>();
+  // LOG(INFO) << "Detections input to detections_to_rects_calculator size: " << detections.size();
+  // for (const Detection& m_detection : detections) {
+  //   LOG(INFO) << "Detections score: " << m_detection.score(0);
+  //   LOG(INFO) << "Detections label: " << m_detection.label(0);
+  //   // LOG(INFO) << "Detections id: " << m_detection.id(0);
+  //   // LOG(INFO) << "Detections track_id: " << m_detection.track_id();
+  // }
+  // LOG(INFO) << "rotate_: " << rotate_;
+  // const auto& image_size = cc->Inputs().Tag(kImageSizeTag).Get<std::pair<int, int>>();
+  // LOG(INFO) << "IMAGE_SIZE" << image_size.first << " " << image_size.second;
+  // LOG(INFO) << "cc->Inputs().Tag(kDetectionTag).IsEmpty(): " << cc->Inputs().Tag(kDetectionsTag).IsEmpty();
+
   if (cc->Inputs().HasTag(kDetectionTag) &&
       cc->Inputs().Tag(kDetectionTag).IsEmpty()) {
+    // LOG(INFO) << "1";
     return absl::OkStatus();
   }
   if (cc->Inputs().HasTag(kDetectionsTag) &&
       cc->Inputs().Tag(kDetectionsTag).IsEmpty()) {
+    // LOG(INFO) << "Detections input to detections_to_rects_calculator is empty";
+    // LOG(INFO) << "2";
     return absl::OkStatus();
   }
   if (rotate_ && !HasTagValue(cc, kImageSizeTag)) {
+    // LOG(INFO) << "3";
     return absl::OkStatus();
   }
 
-  std::vector<Detection> detections;
+  // std::vector<Detection> detections;
   if (cc->Inputs().HasTag(kDetectionTag)) {
+    // LOG(INFO) << "4";
+
     detections.push_back(cc->Inputs().Tag(kDetectionTag).Get<Detection>());
   }
   if (cc->Inputs().HasTag(kDetectionsTag)) {
+    // LOG(INFO) << "5";
     detections = cc->Inputs().Tag(kDetectionsTag).Get<std::vector<Detection>>();
+    // LOG(INFO) << "Detections input to detections_to_rects_calculator size: " << detections.size();
     if (detections.empty()) {
       if (output_zero_rect_for_empty_detections_) {
         if (cc->Outputs().HasTag(kRectTag)) {
@@ -282,23 +308,28 @@ absl::Status DetectionsToRectsCalculator::Process(CalculatorContext* cc) {
                                      cc->InputTimestamp());
   }
   if (cc->Outputs().HasTag(kNormRectsTag)) {
+    // LOG(INFO) << "Det2rects has output tag kNormRectsTag: " << cc->Outputs().HasTag(kNormRectsTag);
     auto output_rects =
         absl::make_unique<std::vector<NormalizedRect>>(detections.size());
     for (int i = 0; i < detections.size(); ++i) {
+      // LOG(INFO) << "index: " << i;
       MP_RETURN_IF_ERROR(DetectionToNormalizedRect(
           detections[i], detection_spec, &(output_rects->at(i))));
       if (rotate_) {
+        // LOG(INFO) << "Need To Rotate";
         float rotation;
         MP_RETURN_IF_ERROR(
             ComputeRotation(detections[i], detection_spec, &rotation));
+        // LOG(INFO) << "setting rotation";
         output_rects->at(i).set_rotation(rotation);
       }
     }
+    // LOG(INFO) << "Add to output";
     cc->Outputs()
         .Tag(kNormRectsTag)
         .Add(output_rects.release(), cc->InputTimestamp());
   }
-
+  // LOG(INFO) << "Exiting Detection to Rects";
   return absl::OkStatus();
 }
 
@@ -308,6 +339,13 @@ absl::Status DetectionsToRectsCalculator::ComputeRotation(
   const auto& location_data = detection.location_data();
   const auto& image_size = detection_spec.image_size;
   RET_CHECK(image_size) << "Image size is required to calculate rotation";
+  // LOG(INFO) << "Getting xy values";
+  // LOG(INFO) << "location_data format: " << location_data.format();
+  // LOG(INFO) << "Sanity check for location_data: " << location_data.has_relative_bounding_box() &&
+  //            location_data.relative_bounding_box().has_xmin() &&
+  //            location_data.relative_bounding_box().has_ymin() &&
+  //            location_data.relative_bounding_box().has_width() &&
+  //            location_data.relative_bounding_box().has_height();
 
   const float x0 = location_data.relative_keypoints(start_keypoint_index_).x() *
                    image_size->first;
@@ -318,6 +356,7 @@ absl::Status DetectionsToRectsCalculator::ComputeRotation(
   const float y1 = location_data.relative_keypoints(end_keypoint_index_).y() *
                    image_size->second;
 
+  // LOG(INFO) << "Finish getting xy values";
   *rotation = NormalizeRadians(target_angle_ - std::atan2(-(y1 - y0), x1 - x0));
 
   return absl::OkStatus();

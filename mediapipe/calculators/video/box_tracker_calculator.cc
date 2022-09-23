@@ -384,7 +384,7 @@ void AddStateToPath(const MotionBoxState& state, int64 time_msec,
     path->insert(insert_pos,
                  InternalTimedBox(result, new MotionBoxState(state)));
   } else {
-    LOG(ERROR) << "Box at time " << time_msec << " already present; ignoring";
+    // LOG(ERROR) << "Box at time " << time_msec << " already present; ignoring";
   }
 }
 

@@ -110,10 +110,14 @@ class BeginLoopCalculator : public CalculatorBase {
   }
 
   absl::Status Process(CalculatorContext* cc) final {
+    // auto rois = cc->Inputs().Tag("ITERABLE").Get<std::vector<NormalizedRect>>();
+    // LOG(INFO) << "Number of ROIs into PoseLandmarkByRoi: " << rois.size();
+    // LOG(INFO) << "Entering BEGIN LOOP";
     Timestamp last_timestamp = loop_internal_timestamp_;
     if (!cc->Inputs().Tag("ITERABLE").IsEmpty()) {
       const IterableT& collection =
           cc->Inputs().Tag("ITERABLE").template Get<IterableT>();
+      // LOG(INFO) << "Number of ROIs into PoseLandmarkByRoi: " << collection.size();
       for (const auto& item : collection) {
         cc->Outputs().Tag("ITEM").AddPacket(
             MakePacket<ItemT>(item).At(loop_internal_timestamp_));

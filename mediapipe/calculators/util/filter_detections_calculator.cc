@@ -55,20 +55,27 @@ class FilterDetectionsCalculator : public CalculatorBase {
     const auto& input_detections =
         cc->Inputs().Tag(kInputDetectionsTag).Get<std::vector<Detection>>();
 
+    // LOG(INFO) << "\n"; // mod
+    // LOG(INFO) << "[Detections size to FilterDetection: " << input_detections.size(); // mod
     auto output_detections = absl::make_unique<std::vector<Detection>>();
-
+    int count = 0;
     for (const Detection& detection : input_detections) {
       RET_CHECK_GT(detection.score_size(), 0);
       // Note: only score at index 0 supported.
-      if (detection.score(0) >= options_.min_score()) {
+      // LOG(INFO) << "Start Filtering";
+      // LOG(INFO) << "label detected: " << detection.label(0);
+      if (detection.label(0) == options_.class_id() && detection.score(0) >= options_.min_score()) {
+        // LOG(INFO) << "Valid Detection";
         output_detections->push_back(detection);
+        count++;
+        if (count == options_.max_num()){break;}
       }
     }
-
+    // LOG(INFO) << "Finish Filtering";
     cc->Outputs()
         .Tag(kOutputDetectionsTag)
         .Add(output_detections.release(), cc->InputTimestamp());
-
+    // LOG(INFO) << "Detections size from FilterDetection: " << count << "]"; // mod
     return absl::OkStatus();
   }
 
