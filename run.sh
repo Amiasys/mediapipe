@@ -37,7 +37,7 @@ run_single_stream(){
 	else
 		GLOG_logtostderr=0 $mediapipe_bin_path  --calculator_graph_config_file=$mediapipe_graph_config_path --stream_number=$i&
 	fi
-	python3 $actdet_path/mediapipe_service.py --who Ziheng --stream_number $i
+	python3 $actdet_path/mediapipe_service.py --stream_number $i
 	local end_time=$SECONDS
 	echo "Task $i with end_time: $end_time"
 	local total_time=$(( end_time - start_time))
