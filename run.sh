@@ -23,9 +23,17 @@ run_single_stream(){
 	local start=`date +%s`
 	local start_time=$SECONDS
 	echo "Task $i with start_time: $start"
+	stream_url=""
+	if [[ $i -eq 1 ]]
+	then
+		stream_url="rtsp://admin:Activity@Kares@10.0.1.201:554/cam/realmonitor?channel=1&subtype=1"
+	else
+		stream_url="rtsp://admin:Activity@Kares@10.0.1.202:554/cam/realmonitor?channel=1&subtype=1"
+	fi
+
 	if [[ $use_input_video -eq 1 ]]
 	then
-		GLOG_logtostderr=0 $mediapipe_bin_path  --calculator_graph_config_file=$mediapipe_graph_config_path --input_video_path=$in_video_path --stream_number=$i&
+		GLOG_logtostderr=0 $mediapipe_bin_path  --calculator_graph_config_file=$mediapipe_graph_config_path --input_video_path=$stream_url --stream_number=$i&
 	else
 		GLOG_logtostderr=0 $mediapipe_bin_path  --calculator_graph_config_file=$mediapipe_graph_config_path --stream_number=$i&
 	fi
