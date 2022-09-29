@@ -48,7 +48,6 @@ using json = nlohmann::json;
 // #include <filesystem>
 
 
-
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "mediapipe/framework/calculator_framework.h"
@@ -87,10 +86,6 @@ ABSL_FLAG(std::string, output_video_path, "",
 ABSL_FLAG(std::string, stream_number, "",
           "ith stream out of total number of n streams. "
           "If not provided, default is 1. ");
-
-ABSL_FLAG(std::string, server_mode, "",
-          "server_mode disable the openc GUI frame"
-          "If not provided, default is true. ");
 
 int frame_count = 0;
 json json_output = {};
@@ -171,14 +166,15 @@ absl::Status RunMPPGraph() {
   cv::VideoWriter writer;
   const bool save_video = !absl::GetFlag(FLAGS_output_video_path).empty();
   if (!save_video) {
-    if (!server_mode) {
-      cv::namedWindow(kWindowName, /*flags=WINDOW_AUTOSIZE*/ 1);
-  #if (CV_MAJOR_VERSION >= 3) && (CV_MINOR_VERSION >= 2)
-      capture.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-      capture.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
-      capture.set(cv::CAP_PROP_FPS, 30);
-  #endif
-    }
+    /*
+      FIXME: disable the opencv frame Display, need add FLAG to control the frame display
+      */
+   // cv::namedWindow(kWindowName, /*flags=WINDOW_AUTOSIZE*/ 1);
+#if (CV_MAJOR_VERSION >= 3) && (CV_MINOR_VERSION >= 2)
+    //capture.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+    //capture.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+    //capture.set(cv::CAP_PROP_FPS, 30);
+#endif
   }
 
   LOG(INFO) << "Start running the calculator graph.";
@@ -432,12 +428,13 @@ absl::Status RunMPPGraph() {
       }
       writer.write(output_frame_mat);
     } else {
-      if (!server_mode) { //FIXME: currently using FLAG:server_mode to control stop displaying the GUI window, need add FLAG to control the opencv window display
-        cv::imshow(kWindowName, output_frame_mat);  
-        const int pressed_key = cv::waitKey(5);
-        if (pressed_key >= 0 && pressed_key != 255) grab_frames = false;
-        // Press any key to exit.
-      }
+      /*
+      FIXME: disable the opencv frame Display, need add FLAG to control the frame display
+        cv::imshow(kWindowName, output_frame_mat);
+      */
+      // Press any key to exit.
+      const int pressed_key = cv::waitKey(5);
+      if (pressed_key >= 0 && pressed_key != 255) grab_frames = false;
     }
 
 
